@@ -58,9 +58,23 @@ func Summary(st model.State) map[string]any {
 	for _, j := range st.Jobs {
 		jobs[j.State]++
 	}
+	purged := 0
 	bytes := 0
 	for _, a := range st.Artifacts {
+		if a.State == "purged" {
+			purged++
+			continue
+		}
 		bytes += len(a.PNG)
 	}
-	return map[string]any{"sceneCount": len(st.Scenes), "assetCount": len(st.Assets), "snapshotCount": len(st.Snapshots), "jobs": jobs, "artifactBytes": bytes, "sequence": st.Sequence}
+	previews := map[string]int{}
+	for _, p := range st.RetentionPreviews {
+		previews[p.State]++
+	}
+	return map[string]any{
+		"sceneCount": len(st.Scenes), "assetCount": len(st.Assets), "snapshotCount": len(st.Snapshots),
+		"jobs": jobs, "artifactBytes": bytes, "liveResultCount": len(st.Artifacts) - purged,
+		"purgedResultCount": purged, "retentionPreviews": previews, "bootId": st.BootID,
+		"sequence": st.Sequence,
+	}
 }

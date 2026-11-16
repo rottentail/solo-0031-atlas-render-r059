@@ -6,6 +6,7 @@ import (
 	"atlas-render/internal/persist"
 	"atlas-render/internal/service"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -34,6 +35,14 @@ func run() error {
 		return e
 	}
 	defer st.Close()
+	svc := service.New(st)
+	if raw := os.Getenv("ATLAS_RETENTION_PREVIEW_TTL"); raw != "" {
+		ttl, e := time.ParseDuration(raw)
+		if e != nil || ttl < time.Second || ttl > 24*time.Hour {
+			return fmt.Errorf("ATLAS_RETENTION_PREVIEW_TTL must be a duration between 1s and 24h")
+		}
+		svc.PreviewTTL = ttl
+	}
 	worker := engine.New(st)
 	if e = worker.Recover(); e != nil {
 		return e
@@ -42,7 +51,7 @@ func run() error {
 	defer stop()
 	done := make(chan struct{})
 	go func() { defer close(done); worker.Run(ctx) }()
-	srv := &http.Server{Addr: addr, Handler: (httpapi.API{Service: &service.Service{Store: st}, Worker: worker}).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
+	srv := &http.Server{Addr: addr, Handler: (httpapi.API{Service: svc, Worker: worker}).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	errc := make(chan error, 1)
 	go func() { log.Printf("Atlas Render listening on %s", addr); errc <- srv.ListenAndServe() }()
 	select {

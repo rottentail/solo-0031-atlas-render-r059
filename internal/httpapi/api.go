@@ -23,10 +23,14 @@ func write(w http.ResponseWriter, status int, v any) {
 func fail(w http.ResponseWriter, e error) {
 	var de *model.Error
 	if errors.As(e, &de) {
-		write(w, de.Status, map[string]string{"code": de.Code, "error": de.Message})
+		body := map[string]any{"code": de.Code, "error": de.Message}
+		for k, v := range de.Details {
+			body[k] = v
+		}
+		write(w, de.Status, body)
 		return
 	}
-	write(w, 500, map[string]string{"code": "internal", "error": "operation could not be committed"})
+	write(w, 500, map[string]any{"code": "internal", "error": "operation could not be committed"})
 }
 func decode(w http.ResponseWriter, r *http.Request, dst any) error {
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 12<<20))
@@ -59,6 +63,10 @@ func (a API) Handler() http.Handler {
 	m.HandleFunc("POST /v1/jobs/{id}/retry", a.retry)
 	m.HandleFunc("GET /v1/artifacts/{id}", a.download)
 	m.HandleFunc("DELETE /v1/artifacts/{id}", a.purge)
+	m.HandleFunc("POST /v1/retention/previews", a.previewRetention)
+	m.HandleFunc("GET /v1/retention/previews", a.listRetention)
+	m.HandleFunc("GET /v1/retention/previews/{id}", a.getRetention)
+	m.HandleFunc("POST /v1/retention/previews/{id}/execute", a.executeRetention)
 	m.HandleFunc("POST /v1/compare", a.compare)
 	m.HandleFunc("GET /v1/status", a.status)
 	m.HandleFunc("GET /v1/events", a.events)

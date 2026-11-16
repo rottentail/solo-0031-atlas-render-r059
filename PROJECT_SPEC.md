@@ -10,7 +10,7 @@
 
 场景 `active ↔ archived`，每次有效状态转换增加修订；归档后拒绝修订和冻结。素材 `available → retired`，相同 ID 不能替换为不同内容。冻结把场景修订与可用素材字节捕获成快照；快照 `active → revoked`，不可恢复。快照摘要覆盖文档和素材闭包，不覆盖可变撤回状态。
 
-任务 `queued → running → succeeded/failed/cancelled`，排队时也可取消。failed/cancelled 可显式重试，attempt 增加且沿用固定输入；succeeded 不能重试。启动恢复将 running 变回 queued，不增加 attempt。结果 `live → purged`，清理不会把成功任务改成失败。
+任务 `queued → running → succeeded/failed/cancelled`，排队时也可取消。failed/cancelled 可显式重试，attempt 增加且沿用固定输入；succeeded 不能重试。启动恢复将 running 变回 queued，不增加 attempt。结果 `live → purged`，清理不会把成功任务改成失败。清理预览 `pending → executed/stale`：预览只记录影响，执行才删除；预览在结果集变化、并发读取、进程重启或超时后失效，过期或失效的预览不能执行。
 
 ## 关键规则
 
@@ -22,10 +22,11 @@
 - 先写入临时文件并调用fsync，再原子替换目标，成功后才切换内存状态。写入失败时旧内存保持可读。
 - 导入包先验证外层摘要、快照摘要、素材闭包、素材摘要和尺寸；目标同名异内容或退役素材会使整个提交失败。
 - 结果比较以解码像素为准，返回改变像素数量、最大单通道差异、平均通道差异。不同尺寸拒绝比较。
+- 清理预览捕获结果集指纹、每个结果的读取计数、进程启动标识和到期时间；执行在同一事务内重新校验并原子提交，读取租约阻止删除正在下载或比较的字节。
 
 ## 模块与接口
 
-`internal/model` 定义实体、错误和摘要；`geometry` 负责矩阵；`paint` 负责采样；`scene` 校验文档和引用；`codec` 限制和编码 PNG；`raster` 编译并绘制；`persist` 独占打开、校验和提交；`service` 组织业务状态；`engine` 执行任务；`bundle` 负责交换格式；`observe` 提供像素与状态观察；`httpapi` 提供 HTTP 入口。具体工作流及跨模块路径见 `.project-manifest.json`。
+`internal/model` 定义实体、错误、摘要和保留预览记录；`geometry` 负责矩阵；`paint` 负责采样；`scene` 校验文档和引用；`codec` 限制和编码 PNG；`raster` 编译并绘制；`persist` 独占打开、校验和提交；`service` 组织业务状态、保留预览与读取租约；`engine` 执行任务；`bundle` 负责交换格式；`observe` 提供像素与状态观察；`httpapi` 提供 HTTP 入口。具体工作流及跨模块路径见 `.project-manifest.json`。
 
 所有JSON请求拒绝未知字段与尾随第二个值，最多12 MiB；素材入口另限2 MiB。领域错误返回 JSON code/error；400输入不合法、404实体不存在、409状态或版本冲突、410结果已清理、429预算或队列不足。内部持久化错误对外返回500。
 
@@ -35,4 +36,4 @@
 
 ## 验证与暂缓边界
 
-构建 `go build ./...`，静态检查 `go vet ./...`。`scripts/walkthrough.py` 通过实际HTTP进程验证生产流，覆盖修订、输入拒绝、归档恢复、素材退役、冻结、撤回、幂等、取消、重试、进程恢复、交换包、像素比较、清理和事件。基线不提供自动化测试套件；完整测试策略、性能与兼容矩阵留待后续任务构建。运行声明使用 `testing: deferred`，省略 `test_command`。
+构建 `go build ./...`，静态检查 `go vet ./...`。`scripts/walkthrough.py` 通过实际HTTP进程验证生产流，覆盖修订、输入拒绝、归档恢复、素材退役、冻结、撤回、幂等、取消、重试、进程恢复、交换包、像素比较、清理、保留预览演练和事件。`retention-drill` 在真实进程上演练预览、令牌篡改、读取失效、新结果失效、重启失效、幂等重放与并发读取；`retention-expiry --preview-ttl 1s` 演练到期拒绝。基线不提供自动化测试套件；完整测试策略、性能与兼容矩阵留待后续任务构建。运行声明使用 `testing: deferred`，省略 `test_command`。

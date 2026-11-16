@@ -4,7 +4,6 @@ import (
 	"atlas-render/internal/model"
 	"atlas-render/internal/raster"
 	"atlas-render/internal/scene"
-	"fmt"
 	"time"
 )
 
@@ -103,29 +102,37 @@ func (s *Service) Retry(id string) (model.Job, error) {
 	})
 	return out, e
 }
-func (s *Service) Purge(id string) error {
-	return s.Store.Update(func(st *model.State) error {
-		a, ok := st.Artifacts[id]
-		if !ok {
-			return model.Missing("artifact not found")
-		}
-		if a.State == "purged" {
-			return nil
-		}
-		a.State = "purged"
-		a.PNG = nil
-		st.Artifacts[id] = a
-		st.Emit("artifact.purged", id)
-		return nil
-	})
+
+// Purge is the single-artifact compatibility entry. It creates a fresh preview
+// for exactly that result and executes it, so even the direct DELETE observes
+// the same staleness, expiry, access and concurrency rules as the preview flow.
+func (s *Service) Purge(id string) (model.RetentionExecution, error) {
+	if _, ok := s.Store.Read().Artifacts[id]; !ok {
+		return model.RetentionExecution{}, model.Missing("artifact not found")
+	}
+	p, e := s.PreviewRetention(RetentionRequest{ArtifactIDs: []string{id}, Note: "direct artifact purge"})
+	if e != nil {
+		return model.RetentionExecution{}, e
+	}
+	out, e := s.ExecuteRetention(p.ID, p.Token, id)
+	if e != nil {
+		// The direct entry has no operator-visible preview to retry, so its
+		// internal one-shot preview is consumed rather than left pending.
+		s.retirePreview(p.ID)
+	}
+	return out, e
 }
+
+// Artifact returns a live result. Purged results yield a stable 410 carrying
+// the retained successful-job facts instead of pretending the job never ran.
 func (s *Service) Artifact(id string) (model.Artifact, error) {
-	a, ok := s.Store.Read().Artifacts[id]
+	st := s.Store.Read()
+	a, ok := st.Artifacts[id]
 	if !ok {
 		return a, model.Missing("artifact not found")
 	}
 	if a.State == "purged" {
-		return a, model.Gone(fmt.Sprintf("artifact %s was purged", id))
+		return a, ArtifactGone(a, st.Jobs[a.JobID])
 	}
 	return a, nil
 }

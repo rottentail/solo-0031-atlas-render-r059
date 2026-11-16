@@ -137,7 +137,7 @@ func (w *Worker) step(parent context.Context) error {
 			s.Emit("job."+v.State, v.ID)
 			return nil
 		}
-		a := model.Artifact{ID: model.ID("png", s.Sequence+1), JobID: v.ID, State: "live", Digest: model.Digest(data), Width: plan.Width, Height: plan.Height, PNG: data}
+		a := model.Artifact{ID: model.ID("png", s.Sequence+1), JobID: v.ID, State: "live", Digest: model.Digest(data), Width: plan.Width, Height: plan.Height, PNG: data, CreatedAt: time.Now().UTC()}
 		s.Artifacts[a.ID] = a
 		v.State = "succeeded"
 		v.ArtifactID = a.ID

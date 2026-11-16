@@ -2,13 +2,10 @@ package service
 
 import (
 	"atlas-render/internal/model"
-	"atlas-render/internal/persist"
 	"atlas-render/internal/scene"
 	"strings"
 	"time"
 )
-
-type Service struct{ Store *persist.Store }
 
 func (s *Service) PutScene(id, name string, expected int, d model.Document) (model.Scene, error) {
 	var out model.Scene

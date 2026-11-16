@@ -71,6 +71,14 @@
     {
       "workflow_id": "observe-service",
       "command": "python3 scripts/walkthrough.py --workflow observe-service"
+    },
+    {
+      "workflow_id": "retention-drill",
+      "command": "python3 scripts/walkthrough.py --workflow retention-drill"
+    },
+    {
+      "workflow_id": "retention-expiry",
+      "command": "python3 scripts/walkthrough.py --workflow retention-expiry --preview-ttl 1s"
     }
   ],
   "environment": {

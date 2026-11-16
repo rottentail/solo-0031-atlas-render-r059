@@ -52,11 +52,16 @@ func (a API) retry(w http.ResponseWriter, r *http.Request) {
 	write(w, 202, v)
 }
 func (a API) download(w http.ResponseWriter, r *http.Request) {
+	// Lease the result before reading it so a concurrent purge either waits or
+	// reports a conflict instead of yanking bytes out of an in-flight response.
+	release := a.Service.OpenRead(r.PathValue("id"))
+	defer release()
 	v, e := a.Service.Artifact(r.PathValue("id"))
 	if e != nil {
 		fail(w, e)
 		return
 	}
+	a.Service.NoteAccess(r.PathValue("id"))
 	etag := `"` + v.Digest + `"`
 	w.Header().Set("ETag", etag)
 	if r.Header.Get("If-None-Match") == etag {
@@ -68,11 +73,12 @@ func (a API) download(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(v.PNG)
 }
 func (a API) purge(w http.ResponseWriter, r *http.Request) {
-	if e := a.Service.Purge(r.PathValue("id")); e != nil {
+	v, e := a.Service.Purge(r.PathValue("id"))
+	if e != nil {
 		fail(w, e)
 		return
 	}
-	write(w, 200, map[string]string{"state": "purged"})
+	write(w, 200, map[string]any{"state": "purged", "artifactId": r.PathValue("id"), "execution": v})
 }
 func (a API) compare(w http.ResponseWriter, r *http.Request) {
 	var b struct {
@@ -83,6 +89,8 @@ func (a API) compare(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
+	release := a.Service.OpenRead(b.Left, b.Right)
+	defer release()
 	left, e := a.Service.Artifact(b.Left)
 	if e != nil {
 		fail(w, e)
@@ -93,6 +101,8 @@ func (a API) compare(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
+	// Comparison is an access: a preview taken before it must be refreshed.
+	a.Service.NoteAccess(b.Left, b.Right)
 	v, e := observe.Compare(left, right)
 	if e != nil {
 		fail(w, e)

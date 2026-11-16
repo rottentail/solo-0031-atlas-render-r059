@@ -46,8 +46,33 @@ func Open(path string) (*Store, error) {
 			return nil, e
 		}
 	}
+	if e = s.markBoot(); e != nil {
+		s.Close()
+		return nil, e
+	}
 	return s, nil
 }
+
+// markBoot stamps a fresh boot identity so previews recorded before a restart
+// can never be executed afterwards. Pending previews are kept as audit history
+// but marked stale; their tokens also carry the old boot identity.
+func (s *Store) markBoot() error {
+	boot := model.NewBootID()
+	return s.Update(func(st *model.State) error {
+		st.BootID = boot
+		if st.RetentionPreviews == nil {
+			st.RetentionPreviews = map[string]model.RetentionPreview{}
+		}
+		for id, p := range st.RetentionPreviews {
+			if p.State == "pending" {
+				p.State = "stale"
+				st.RetentionPreviews[id] = p
+			}
+		}
+		return nil
+	})
+}
+
 func (s *Store) Close() error {
 	if s.lock == nil {
 		return nil
@@ -62,6 +87,9 @@ func (s *Store) Update(fn func(*model.State) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next := model.Clone(s.state)
+	if next.RetentionPreviews == nil {
+		next.RetentionPreviews = map[string]model.RetentionPreview{}
+	}
 	if e := fn(&next); e != nil {
 		return e
 	}

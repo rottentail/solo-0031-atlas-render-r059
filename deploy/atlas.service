@@ -8,6 +8,7 @@ User=atlas
 WorkingDirectory=/opt/atlas
 Environment=ATLAS_ADDR=127.0.0.1:8763
 Environment=ATLAS_STATE=/var/lib/atlas/state.json
+Environment=ATLAS_RETENTION_PREVIEW_TTL=10m
 ExecStart=/opt/atlas/atlas
 Restart=on-failure
 TimeoutStopSec=20

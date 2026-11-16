@@ -75,12 +75,23 @@ func Validate(s model.State) error {
 			if model.Digest(a.PNG) != a.Digest {
 				return fmt.Errorf("artifact digest mismatch")
 			}
+			if a.PurgedAt != nil {
+				return fmt.Errorf("live artifact carries purge timestamp")
+			}
 		case "purged":
 			if len(a.PNG) != 0 {
 				return fmt.Errorf("purged artifact retains bytes")
 			}
 		default:
 			return fmt.Errorf("invalid artifact state")
+		}
+	}
+	for id, p := range s.RetentionPreviews {
+		if id != p.ID {
+			return fmt.Errorf("invalid retention preview key %s", id)
+		}
+		if e := model.ValidateRetentionPreview(p); e != nil {
+			return e
 		}
 	}
 	for key, r := range s.Receipts {

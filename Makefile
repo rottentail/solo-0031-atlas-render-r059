@@ -1,4 +1,4 @@
-.PHONY: build vet run demo
+.PHONY: build vet run demo drill
 build:
 	go build ./...
 vet:
@@ -7,3 +7,5 @@ run:
 	go run ./cmd/atlas
 demo:
 	python3 scripts/walkthrough.py --workflow submit-render --out var/demo
+drill:
+	python3 scripts/walkthrough.py --workflow retention-drill

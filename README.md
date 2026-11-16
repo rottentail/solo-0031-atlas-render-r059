@@ -23,6 +23,8 @@ python3 scripts/walkthrough.py --workflow retry-render
 python3 scripts/walkthrough.py --workflow recover-render
 python3 scripts/walkthrough.py --workflow import-package
 python3 scripts/walkthrough.py --workflow compare-renders
+python3 scripts/walkthrough.py --workflow retention-drill
+python3 scripts/walkthrough.py --workflow retention-expiry --preview-ttl 1s
 ```
 
 脚本在临时状态目录启动实际服务，通过 HTTP 完成操作后停止服务，输出任务状态和 PNG 摘要；`--out` 保存可查看的合成示例。恢复流程会强制结束脚本自己启动的服务进程，再验证恢复结果。所有工作流编号见 `.project-manifest.json`。
@@ -42,6 +44,6 @@ python3 scripts/walkthrough.py --workflow compare-renders
 
 透明度为 0–1，变换中的 `scaleX`、`scaleY` 必须显式设置；省略会成为零而被拒绝。组的透明度乘到每个后代，属于分布式透明语义；当前没有离屏隔离组。缩放 2 表示两倍尺寸渲染，不表示输出降采样。位图按最近邻采样，颜色直接在编码通道上混合。
 
-持久化使用完整 JSON 状态的原子替换，保留全部任务与快照，事件只保留最近 500 条。适合中小规模、单写实例工作负载。清理结果只释放 PNG 字节，仍保留任务事实和摘要。进程重启可恢复任务；突然断电的文件系统耐久性不作额外保证。
+持久化使用完整 JSON 状态的原子替换，保留全部任务与快照，事件只保留最近 500 条。适合中小规模、单写实例工作负载。结果清理分两步：`POST /v1/retention/previews` 先预览影响，再以预览令牌执行，令牌在结果集变化、并发读取、重启或过期后失效；清理只释放 PNG 字节，仍保留任务事实和摘要。进程重启可恢复任务；突然断电的文件系统耐久性不作额外保证。
 
 测试处于 deferred 阶段，基线未包含自动化测试套件或 `test_command`。生产工作流检查、构建与静态检查已单独提供。接口和持久状态的规则详见 `PROJECT_SPEC.md`、`docs/api.md`、`docs/operations.md`。

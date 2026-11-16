@@ -335,6 +335,24 @@
       "verification": "python3 scripts/walkthrough.py --workflow purge-artifact"
     },
     {
+      "id": "retention-drill",
+      "name": "结果保留预览与执行演练",
+      "entry": "POST /v1/retention/previews + POST /v1/retention/previews/{id}/execute",
+      "success": "预览影响后执行清理，令牌在读取、新结果、重启或过期后失效，成功事实保留",
+      "failure": "篡改令牌、失效预览或占用中的结果返回409且不删除字节",
+      "module_ids": [
+        "httpapi",
+        "service",
+        "persist",
+        "model"
+      ],
+      "steps": [
+        "经公开HTTP入口完成领域转换",
+        "通过存储或渲染结果观察已提交事实"
+      ],
+      "verification": "python3 scripts/walkthrough.py --workflow retention-drill"
+    },
+    {
       "id": "observe-service",
       "name": "观察执行过程",
       "entry": "GET /v1/status + GET /v1/events",
